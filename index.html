@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEO-VLA: Native Vision-Language-Action Policies</title>
+<meta name="description" content="NEO-VLA is an encoder-free vision-language-action policy built on the native NEO-2B backbone. Action-relevant information sits in shallow backbone layers, the gains come from native vision-language pretraining, and understanding data matters in post-training.">
+<meta property="og:title" content="From Pixels to Actions: Towards Native Vision-Language-Action Policies">
+<meta property="og:description" content="NEO-VLA: an encoder-free VLA policy. Findings on readout depth, native pretraining, and understanding data in post-training.">
+<meta property="og:image" content="static/figures/overview.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --ink: #1f1d24;
+  --muted: #5f5c68;
+  --faint: #8d8a96;
+  --rule: #e4e2ea;
+  --accent: #5b4b8a;
+  --ours: #f3f0f8;
+  --bar: #c4c1cc;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --sans: "Source Sans 3", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text: 700px;
+  --wide: 1000px;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 18px/1.65 var(--serif);
+  font-optical-sizing: auto;
+}
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.col { max-width: var(--text); margin: 0 auto; padding: 0 16px; }
+.wide { max-width: var(--wide); margin: 0 auto; padding: 0 16px; }
+
+/* header */
+header.col { padding: 64px 16px 36px; }
+.venue { font: 600 13px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin: 0 0 18px; }
+h1 { font-weight: 600; font-size: 38px; line-height: 1.18; letter-spacing: -.01em; margin: 0 0 8px; }
+.subtitle { font-size: 20px; color: var(--muted); margin: 0 0 28px; }
+.authors { font: 16px/1.7 var(--sans); margin: 0 0 6px; }
+.authors span { white-space: nowrap; margin-right: 12px; }
+.authors sup, .affils sup { font-size: 11px; color: var(--muted); margin-left: 1px; }
+.affils { font: 15px/1.6 var(--sans); color: var(--muted); margin: 0 0 4px; }
+.notes { font: 13px/1.6 var(--sans); color: var(--faint); margin: 0 0 22px; }
+.links { display: flex; flex-wrap: wrap; gap: 8px; font: 600 14px/1 var(--sans); }
+.links a, .links span {
+  display: inline-block; padding: 9px 14px; border: 1px solid var(--rule); border-radius: 4px;
+  color: var(--ink); text-decoration: none;
+}
+.links a:hover { border-color: var(--accent); color: var(--accent); }
+.links span { color: var(--faint); font-weight: 400; }
+
+/* sections */
+section.col, section.wide { padding-top: 8px; padding-bottom: 8px; }
+h2 { font-size: 27px; font-weight: 600; line-height: 1.25; margin: 40px 0 14px; letter-spacing: -.005em; }
+h2 .num { font: 600 14px/1 var(--sans); color: var(--accent); display: block; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 10px; }
+h3 { font: 600 17px/1.4 var(--sans); margin: 30px 0 8px; }
+p { margin: 0 0 16px; }
+.lede { font-size: 20px; line-height: 1.6; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 40px auto; max-width: var(--text); }
+
+/* finding summary list */
+.findings { list-style: none; padding: 0; margin: 24px 0 8px; counter-reset: f; }
+.findings li { counter-increment: f; position: relative; padding: 14px 0 14px 44px; border-top: 1px solid var(--rule); }
+.findings li:last-child { border-bottom: 1px solid var(--rule); }
+.findings li::before { content: counter(f); position: absolute; left: 4px; top: 13px; font: 600 22px/1.2 var(--serif); color: var(--accent); }
+.findings a { color: inherit; text-decoration: none; }
+.findings a:hover strong { color: var(--accent); }
+.findings small { display: block; font: 15px/1.5 var(--sans); color: var(--muted); margin-top: 3px; }
+
+.takeaway { border-left: 3px solid var(--accent); padding: 2px 0 2px 18px; margin: 22px 0; font-style: italic; }
+
+/* figures */
+figure { margin: 26px 0 30px; }
+figure img { width: 100%; height: auto; display: block; }
+figcaption { font: 14.5px/1.55 var(--sans); color: var(--muted); margin-top: 10px; }
+figcaption b { color: var(--ink); font-weight: 600; }
+.wide figcaption { max-width: var(--text); }
+
+/* videos */
+.vgrid { display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); }
+.vgrid.two { grid-template-columns: repeat(2, 1fr); }
+.vgrid figure { margin: 0; }
+video { width: 100%; height: auto; display: block; background: #111; border-radius: 2px; aspect-ratio: 16 / 9; object-fit: cover; }
+.vlabel { font: 13.5px/1.45 var(--sans); color: var(--muted); margin-top: 6px; }
+.vlabel b { color: var(--ink); font-weight: 600; }
+.task { margin: 30px 0 34px; }
+.task h3 { margin-top: 0; }
+.task p { font-size: 16px; color: var(--muted); margin-bottom: 12px; }
+
+/* tables */
+.tablewrap { overflow-x: auto; margin: 18px 0 8px; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font: 14.5px/1.4 var(--sans); font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-weight: 600; border-bottom: 1px solid var(--ink); vertical-align: bottom; }
+thead tr:first-child th { border-top: 1.5px solid var(--ink); }
+tbody tr:last-child td { border-bottom: 1.5px solid var(--ink); }
+tbody tr.sep td { border-top: 1px solid var(--rule); }
+tr.ours td { background: var(--ours); font-weight: 600; }
+td.dim, th.dim { color: var(--faint); }
+td b { font-weight: 700; }
+.tcap { font: 14.5px/1.55 var(--sans); color: var(--muted); margin: 0 0 6px; }
+.tcap b { color: var(--ink); }
+.tnote { font: 13px/1.5 var(--sans); color: var(--faint); margin: 6px 0 22px; }
+.group td { font: 600 12px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); padding-top: 14px; }
+
+/* bar rows */
+.bars { margin: 18px 0 8px; font: 14.5px/1.3 var(--sans); font-variant-numeric: tabular-nums; }
+.bars .row { display: grid; grid-template-columns: minmax(150px, 34%) 1fr 52px; align-items: center; gap: 12px; padding: 5px 0; }
+.bars .row .lab { color: var(--ink); }
+.bars .row .lab small { display: block; color: var(--faint); font-size: 12.5px; }
+.bars .track { height: 14px; position: relative; }
+.bars .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--bar); border-radius: 0 3px 3px 0; }
+.bars .row.hi .fill { background: var(--accent); }
+.bars .row.hi .lab, .bars .row.hi .val { font-weight: 600; }
+.bars .val { text-align: right; }
+.bars .head { font: 600 12px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); padding: 14px 0 4px; }
+.bars .axis { display: grid; grid-template-columns: minmax(150px, 34%) 1fr 52px; gap: 12px; font-size: 12px; color: var(--faint); border-top: 1px solid var(--rule); margin-top: 6px; padding-top: 4px; }
+.bars .axis .ticks { display: flex; justify-content: space-between; }
+
+/* dot plots: zoomed axis, so marks are dots rather than bars */
+.bars.dots .track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dotted var(--rule); }
+.bars.dots .fill { width: 12px !important; height: 12px; top: 1px; border-radius: 50%; background: var(--bar); transform: translateX(-6px); }
+.bars.dots .row.hi .fill { background: var(--accent); }
+.bars.dots .axis .ticks { position: relative; height: 14px; display: block; }
+.bars.dots .axis .ticks span { position: absolute; transform: translateX(-50%); }
+.axisnote { font: 12px/1.4 var(--sans); color: var(--faint); margin-top: 2px; text-align: right; }
+
+pre { background: #f7f6f9; border: 1px solid var(--rule); border-radius: 4px; padding: 14px 16px; overflow-x: auto; font: 13px/1.55 var(--mono); margin: 12px 0; }
+.copy { font: 600 13px/1 var(--sans); background: none; border: 1px solid var(--rule); border-radius: 4px; padding: 7px 10px; cursor: pointer; color: var(--muted); }
+.copy:hover { color: var(--accent); border-color: var(--accent); }
+
+footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(--faint); }
+
+@media (max-width: 720px) {
+  body { font-size: 17px; }
+  header.col { padding-top: 40px; }
+  h1 { font-size: 29px; }
+  .subtitle, .lede { font-size: 18px; }
+  h2 { font-size: 23px; }
+  .vgrid { grid-template-columns: 1fr 1fr; }
+  .bars .row, .bars .axis { grid-template-columns: 112px 1fr 44px; gap: 8px; }
+}
+@media (max-width: 460px) {
+  .vgrid, .vgrid.two { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header class="col">
+  <p class="venue">Preprint &middot; 2026</p>
+  <h1>From Pixels to Actions: Towards Native Vision-Language-Action Policies</h1>
+  <p class="subtitle">NEO-VLA, an encoder-free VLA policy built on a native vision-language backbone</p>
+
+  <p class="authors">
+    <span>Weichen Fan<sup>1,*</sup></span>
+    <span>Haiwen Diao<sup>1,*,&#9839;</sup></span>
+    <span>Penghao Wu<sup>1</sup></span>
+    <span>Siyuan Hu<sup>1</sup></span>
+    <span>Ziqi Huang<sup>1</sup></span>
+    <span>Tianqi Liu<sup>1,3</sup></span>
+    <span>Mingze Sun<sup>1</sup></span>
+    <span>Ziyi Wang<sup>1</sup></span>
+    <span>Zhongang Cai<sup>2</sup></span>
+    <span>Hanming Deng<sup>2</sup></span>
+    <span>Quan Wang<sup>2</sup></span>
+    <span>Lei Yang<sup>2</sup></span>
+    <span>Lewei Lu<sup>2</sup></span>
+    <span>Fangzhou Hong<sup>3</sup></span>
+    <span>Zhaoxi Chen<sup>3</sup></span>
+    <span>Dahua Lin<sup>2</sup></span>
+    <span>Ziwei Liu<sup>1,&dagger;</sup></span>
+  </p>
+  <p class="affils"><sup>1</sup>S-Lab, Nanyang Technological University &nbsp; <sup>2</sup>SenseTime Research &nbsp; <sup>3</sup>Ropedia</p>
+  <p class="notes">* Equal contribution &nbsp; &#9839; Project lead &nbsp; &dagger; Corresponding author</p>
+
+  <nav class="links" aria-label="Resources">
+    <span title="Link will be added when available">Paper (coming soon)</span>
+    <span title="Link will be added when available">Code (coming soon)</span>
+    <span title="Link will be added when available">Weights (coming soon)</span>
+    <a href="#bibtex">BibTeX</a>
+  </nav>
+</header>
+
+<div class="wide">
+  <div class="vgrid" id="teaser">
+    <figure>
+      <video src="static/videos/task1_2.mp4" poster="static/posters/task1_2.jpg" muted loop playsinline preload="none" data-autoplay></video>
+      <div class="vlabel"><b>Tennis ball on can.</b> Precise placement on a surface smaller than the ball.</div>
+    </figure>
+    <figure>
+      <video src="static/videos/task2_1.mp4" poster="static/posters/task2_1.jpg" muted loop playsinline preload="none" data-autoplay></video>
+      <div class="vlabel"><b>Tape in bowl, then ball in tape.</b> A two-step task.</div>
+    </figure>
+    <figure>
+      <video src="static/videos/task3_1.mp4" poster="static/posters/task3_1.jpg" muted loop playsinline preload="none" data-autoplay></video>
+      <div class="vlabel"><b>Stand can in tape.</b> Reorient a lying can and insert it upright.</div>
+    </figure>
+  </div>
+</div>
+
+<main>
+<section class="col" id="summary">
+  <p class="lede">Most vision-language-action (VLA) models see the world through a separately pretrained vision encoder. The action policy only receives that encoder's final output, after local geometry, edges and depth cues have already been abstracted away. NEO-VLA drops the encoder. Pixels go through a lightweight convolutional patch embedder straight into a native vision-language backbone, and a flow-matching action expert reads from whichever backbone layers we choose.</p>
+  <p>Because the readout depth becomes a design choice, we can ask where in the backbone the information needed for control actually lives. Three findings come out of this study:</p>
+
+  <ol class="findings">
+    <li><a href="#finding-1"><strong>Action-relevant information sits in the shallow layers of the VLM.</strong>
+      <small>Reading early layers beats reading late layers at matched expert size, and intervening on layers 0&ndash;10 changes the predicted action far more than intervening on later layers.</small></a></li>
+    <li><a href="#finding-2"><strong>Attaching Qwen's vision encoder to the action expert does not help. The gain comes from native vision-language pretraining.</strong>
+      <small>Routing the expert to Qwen3-VL's intermediate vision-tower features lowers frozen-backbone LIBERO success from 79.5% to 64.9%. The frozen native backbone reaches 90.9%.</small></a></li>
+    <li><a href="#finding-3"><strong>Understanding data matters in post-training.</strong>
+      <small>On RoboTwin 2.0 Clean2Rand, co-training with NEO's understanding corpus gives 69.4%, a caption-only mix gives 47.2%, and action data alone gives 10.7%.</small></a></li>
+  </ol>
+</section>
+
+<section class="wide" id="method">
+  <div class="col" style="padding:0">
+    <h2><span class="num">Model</span>Pixels in, continuous actions out</h2>
+    <p>Encoder-based VLAs (a, b below) pass pixels through a visual encoder and hand its output to the language model. NEO-VLA (c) maps pixels directly into the backbone token space, so image patches and instruction words are processed together in every layer. A separate, narrow action expert attends to the cached keys and values of selected backbone layers and predicts a flow-matching velocity field over 30-step action chunks.</p>
+  </div>
+  <figure>
+    <img src="static/figures/overview.png" alt="Three VLA designs: encoder-based with quantised actions, encoder-based with an action flow head, and encoder-free with an action flow head." loading="lazy">
+    <figcaption><b>Three VLA policy designs.</b> (a) Encoder-based VLA with discrete action tokens. (b) The same encoder-based interface with a continuous action head. (c) NEO-VLA removes the separately pretrained encoder; a patch embedder feeds pixels into the backbone, and the action expert reads keys and values from selected backbone layers.</figcaption>
+  </figure>
+  <figure>
+    <img src="static/figures/NEO-VLA_Model_Overview.png" alt="NEO-VLA architecture: previous and current camera views, camera geometry, a structured prompt and robot state form a prefix for the 40-layer NEO-2B backbone; an action expert reads per-layer keys and values and predicts arm and body action chunks." loading="lazy">
+    <figcaption><b>NEO-VLA architecture.</b> The prefix holds previous and current multi-view images (up to 88 visual tokens per view, stride-32 patches), camera intrinsics and rotation, a structured prompt (control frequency, embodiment, action frame, instruction) and robot state. The backbone is NEO-2B, a 40-layer decoder-only native vision-language model with no ViT, autoencoder or VQ codebook in the visual path. The action expert outputs two 26-D arm chunks and one 8-D body chunk; inference uses 10 Euler steps.</figcaption>
+  </figure>
+</section>
+
+<hr>
+
+<section class="col" id="finding-1">
+  <h2><span class="num">Finding 1</span>Action-relevant information sits in the shallow layers of the VLM</h2>
+  <p>Each layer of the action expert reads the cached keys and values of one backbone layer. We keep the expert fixed at 28 layers and change only which backbone layers it reads: <code>skip-28</code> spreads its reads across all 40 layers, <code>end-28</code> reads layers 12&ndash;39, and <code>first-28</code> reads layers 0&ndash;27.</p>
+
+  <div class="bars dots" data-min="80" data-max="100" role="figure" aria-label="LIBERO average success rate by layer map">
+    <p class="tcap"><b>Layer-map ablation on LIBERO.</b> Average success (%) over the four suites, 2,000 rollouts per configuration, step 30k.</p>
+    <div class="head">Frozen backbone</div>
+    <div class="row hi"><div class="lab">first-28 <small>layers 0&ndash;27 &middot; depth 28</small></div><div class="track"><div class="fill" style="width:94.9%"></div></div><div class="val">94.9</div></div>
+    <div class="row"><div class="lab">skip-28 <small>uniform over 0&ndash;39</small></div><div class="track"><div class="fill" style="width:90.9%"></div></div><div class="val">90.9</div></div>
+    <div class="row"><div class="lab">end-28 <small>layers 12&ndash;39</small></div><div class="track"><div class="fill" style="width:86.7%"></div></div><div class="val">86.7</div></div>
+    <div class="head">Frozen backbone, disjoint 14-layer maps</div>
+    <div class="row hi"><div class="lab">first-14 <small>layers 0&ndash;13 &middot; depth 14</small></div><div class="track"><div class="fill" style="width:93.6%"></div></div><div class="val">93.6</div></div>
+    <div class="row"><div class="lab">last-14 <small>layers 26&ndash;39</small></div><div class="track"><div class="fill" style="width:89.6%"></div></div><div class="val">89.6</div></div>
+    <div class="head">Full fine-tuning</div>
+    <div class="row"><div class="lab">first-28</div><div class="track"><div class="fill" style="width:94.6%"></div></div><div class="val">94.6</div></div>
+    <div class="row hi"><div class="lab">skip-28</div><div class="track"><div class="fill" style="width:95.3%"></div></div><div class="val">95.3</div></div>
+    <div class="row"><div class="lab">end-28</div><div class="track"><div class="fill" style="width:92.5%"></div></div><div class="val">92.5</div></div>
+    <div class="axis"><div></div><div class="ticks"></div><div></div></div>
+  </div>
+  <p class="tnote">The cleanest comparison is <code>skip-28</code> vs. <code>end-28</code>: both keep all 40 backbone layers and the same 28-layer expert, and differ only in whether early layers are read. <code>first-28</code> and <code>first-14</code> also shorten the backbone, so they change depth and compute as well as readout position.</p>
+
+  <p>With a frozen backbone, dropping access to the first 12 layers costs 4.2 points (90.9 &rarr; 86.7). Full fine-tuning narrows the gap but does not close it (95.3 vs. 92.5).</p>
+
+  <h3>Where the expert is sensitive</h3>
+  <p>To see which attachment points matter, we intervene on one at a time. Replacing the keys and values at one layer with those from a different observation and task raises translation error most at layers 0&ndash;10. Noise of the same magnitude stays within 0.004&nbsp;cm of the unchanged error, so the effect comes from the content being replaced, not the size of the disturbance. Masking the wrist image hurts most around layers 6&ndash;10; masking the instruction hurts most at layer 0, with a smaller rise near layer 17.</p>
+</section>
+
+<div class="wide">
+  <figure>
+    <img src="static/figures/NEO-VLA_Layer_Study.png" alt="Three panels. A: translation error after swapping keys and values at each backbone layer is highest for layers 0 to 10. B: masking the wrist image peaks around layers 6 to 10; masking the instruction peaks at layer 0. C: masking wrist-camera pose matters only at layer 0 and only for a wrist-frame model." loading="lazy">
+    <figcaption><b>Interventions at the expert's attachment points</b> (diagnostic <code>skip-28</code> models). (A) Translation error after swapping one attachment's cached keys and values with another observation's (bars), adding matched-magnitude noise (orange), or no change (dashed). (B) Action change when masking the wrist image or the instruction; filled and open markers are separate even- and odd-attachment runs. (C) Masking the wrist-camera pose has little effect in the robot-frame model but a large effect at layer 0 in a wrist-frame model, which shows the test can detect pose use.</figcaption>
+  </figure>
+</div>
+
+<section class="col" style="padding-top:0">
+  <h3>What a linear probe can read at each depth</h3>
+  <p>Linear probes on frozen backbones tell a consistent story. All three backbones carry similar peak depth and correspondence information, and the peak is early in each (22&ndash;32% of depth). The difference is in what the action expert can reach: averaged over the layers the expert reads, NEO's representations are far more linearly decodable.</p>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th rowspan="2">Backbone</th><th colspan="2" style="text-align:center">Depth (&delta;<sub>1</sub>, %)</th><th colspan="2" style="text-align:center">Correspondence (PCK@0.1, %)</th></tr>
+        <tr><th>Peak (rel. depth)</th><th>Read-layer mean</th><th>Peak (rel. depth)</th><th>Read-layer mean</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Qwen3-VL-2B</td><td>78.2 (0.22)</td><td>54.6</td><td>61.5 (0.28)</td><td>38.2</td></tr>
+        <tr><td>Gemma-3-4B</td><td>80.1 (0.25)</td><td>57.9</td><td>63.7 (0.30)</td><td>41.0</td></tr>
+        <tr class="ours"><td>NEO-2B (native)</td><td>79.4 (0.30)</td><td>73.8</td><td>62.8 (0.32)</td><td>58.1</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tnote">Probes are trained on held-out images with the backbone frozen; no robot actions are involved. Higher is better.</p>
+  <p class="takeaway">Control draws on early, spatially detailed computation inside the backbone, and a policy that only sees the last layers leaves that on the table.</p>
+</section>
+
+<hr>
+
+<section class="col" id="finding-2">
+  <h2><span class="num">Finding 2</span>Attaching Qwen's vision encoder to the expert does not help; the gain comes from native pretraining</h2>
+  <p>We put three backbones under the same action expert and robot-training corpus: Qwen3-VL-2B, Gemma-3-4B and NEO-2B. With the backbone frozen, only the expert learns, so the policy must work with the pretrained representations as they are. NEO-2B reaches 90.9% here, 11.4 points above Qwen3-VL and on par with both encoder-based models after full fine-tuning.</p>
+
+  <div class="tablewrap">
+    <p class="tcap"><b>Backbone comparison on LIBERO.</b> Success (%) at the final 30k-step checkpoint, 500 episodes per suite.</p>
+    <table>
+      <thead>
+        <tr><th>Backbone</th><th>Size</th><th>Adaptation</th><th>Spatial</th><th>Object</th><th>Goal</th><th>Long</th><th>Average</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Qwen3-VL</td><td>2B</td><td>Frozen</td><td>71.4</td><td>89.8</td><td>92.8</td><td>64.0</td><td>79.5</td></tr>
+        <tr><td></td><td></td><td>Encoder unfrozen<sup>a</sup></td><td>91.8</td><td>92.0</td><td>94.0</td><td>79.0</td><td>89.2</td></tr>
+        <tr><td></td><td></td><td>Full FT</td><td>92.2</td><td>96.6</td><td>95.8</td><td>78.6</td><td>90.8</td></tr>
+        <tr class="sep"><td>Gemma-3</td><td>4B</td><td>Frozen</td><td>80.2</td><td>93.6</td><td>92.6</td><td>71.6</td><td>84.5</td></tr>
+        <tr><td></td><td></td><td>Full FT</td><td>89.0</td><td><b>97.6</b></td><td>94.8</td><td>82.8</td><td>91.05</td></tr>
+        <tr class="ours sep"><td>NEO-VLA</td><td>2B</td><td>Frozen</td><td>89.2</td><td>95.8</td><td>93.2</td><td><b>85.4</b></td><td>90.9</td></tr>
+        <tr class="ours"><td></td><td></td><td>Full FT</td><td><b>96.4</b></td><td>97.2</td><td><b>96.2</b></td><td>84.6</td><td><b>93.6</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tnote"><sup>a</sup> Updates the vision encoder and action expert with other layers frozen; uses a replan interval of 4 and horizon of 8 instead of 12 and 20.</p>
+
+  <h3>Giving the expert direct access to Qwen's vision tower</h3>
+  <p>A natural objection is that NEO-VLA wins only because its expert can reach early visual features, which an encoder-based VLA hides behind the encoder output. We tested this directly: in Qwen3-VL we route 13 expert layers to intermediate vision-tower features instead. This adds no parameters.</p>
+
+  <div class="bars dots" data-min="60" data-max="100" role="figure" aria-label="Average LIBERO success for Qwen3-VL with the original interface versus direct encoder access, compared with NEO-VLA">
+    <p class="tcap"><b>Direct encoder access in Qwen3-VL.</b> Average LIBERO success (%), same setting as above.</p>
+    <div class="head">Frozen backbone</div>
+    <div class="row"><div class="lab">Qwen3-VL, original interface</div><div class="track"><div class="fill" style="width:79.5%"></div></div><div class="val">79.5</div></div>
+    <div class="row"><div class="lab">Qwen3-VL + encoder access</div><div class="track"><div class="fill" style="width:64.9%"></div></div><div class="val">64.9</div></div>
+    <div class="row hi"><div class="lab">NEO-VLA</div><div class="track"><div class="fill" style="width:90.9%"></div></div><div class="val">90.9</div></div>
+    <div class="head">Full fine-tuning</div>
+    <div class="row"><div class="lab">Qwen3-VL, original interface</div><div class="track"><div class="fill" style="width:90.8%"></div></div><div class="val">90.8</div></div>
+    <div class="row"><div class="lab">Qwen3-VL + encoder access</div><div class="track"><div class="fill" style="width:90.9%"></div></div><div class="val">90.9</div></div>
+    <div class="row hi"><div class="lab">NEO-VLA</div><div class="track"><div class="fill" style="width:93.6%"></div></div><div class="val">93.6</div></div>
+    <div class="axis"><div></div><div class="ticks"></div><div></div></div>
+  </div>
+
+  <p>Encoder access makes the frozen Qwen3-VL policy worse (79.5 &rarr; 64.9), and after full fine-tuning the two interfaces are equal (90.8 vs. 90.9). Early visual features are only useful when they are learned jointly with language and presented in the space the rest of the model uses. NEO's encoder-free pretraining produces such features; an encoder bolted on in front of a language model does not.</p>
+  <p class="tnote">Caveat: the backbones differ in pretraining data and capacity, so this comparison does not isolate the effect of removing the encoder alone. It does show that the native backbone is a strong starting point for action learning.</p>
+  <p class="takeaway">Exposing more of a conventional encoder is not enough. The benefit of NEO-VLA comes from native, encoder-free vision-language pretraining.</p>
+</section>
+
+<hr>
+
+<section class="col" id="finding-3">
+  <h2><span class="num">Finding 3</span>Understanding data matters in post-training</h2>
+  <p>VLA post-training is usually done either on action data alone or with some vision-language data mixed in. We compared three recipes on RoboTwin 2.0, trained on clean scenes and evaluated on randomized ones (Clean2Rand): co-training with NEO-2B's own multimodal understanding corpus, co-training with ShareGPT4V-COCO captions, and action data only.</p>
+
+  <div class="bars" role="figure" aria-label="RoboTwin 2.0 Clean2Rand success rate by post-training recipe">
+    <p class="tcap"><b>Post-training recipe ablation.</b> RoboTwin 2.0 Clean2Rand success (%).</p>
+    <div class="row hi"><div class="lab">+ NEO understanding data</div><div class="track"><div class="fill" style="width:69.4%"></div></div><div class="val">69.4</div></div>
+    <div class="row"><div class="lab">+ ShareGPT4V-COCO</div><div class="track"><div class="fill" style="width:47.2%"></div></div><div class="val">47.2</div></div>
+    <div class="row"><div class="lab">Action data only</div><div class="track"><div class="fill" style="width:10.7%"></div></div><div class="val">10.7</div></div>
+    <div class="axis"><div></div><div class="ticks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div><div></div></div>
+  </div>
+
+  <p>Training on action data alone collapses under randomization. Simple captions recover part of the gap, and the backbone's own understanding corpus recovers most of it. In our recipe, understanding examples are packed into every other optimizer step with an auxiliary next-token loss weighted by 0.1.</p>
+  <p class="takeaway">Keeping the backbone's understanding ability alive during action training is what lets the policy hold up when scenes change, and the closer the co-training data is to the backbone's pretraining corpus, the better.</p>
+</section>
+
+<hr>
+
+<section class="col" id="real-world">
+  <h2><span class="num">Real robot</span>Three tasks, 50 demonstrations each</h2>
+  <p>We built a small real-world benchmark to test precise placement, multi-step execution and object reorientation. Each model is fine-tuned on 50 episodes per task and evaluated over 20 trials: 10 in-domain and 10 out-of-domain. All methods use the same real data and their own recommended post-training settings.</p>
+</section>
+<div class="wide">
+  <figure style="margin-top:6px">
+    <img src="static/figures/three_robot_tasks.jpg" alt="Illustration of three tasks: place a tennis ball on a can; put a tape roll in a bowl then a ball in the roll; stand a lying can upright in a tape roll." loading="lazy">
+  </figure>
+</div>
+<section class="col" style="padding-top:0">
+  <div class="tablewrap">
+    <p class="tcap"><b>Real-world success</b> (successes / 20 trials).</p>
+    <table>
+      <thead><tr><th>Model</th><th>Size</th><th>Task 1: ball on can</th><th>Task 2: tape &amp; ball</th><th>Task 3: can in tape</th></tr></thead>
+      <tbody>
+        <tr><td>StarVLA</td><td>3B</td><td>1/20</td><td>2/20</td><td>0/20</td></tr>
+        <tr><td>&pi;<sub>0.5</sub></td><td>3B</td><td>10/20</td><td>14/20</td><td><b>13/20</b></td></tr>
+        <tr class="ours"><td>NEO-VLA</td><td>2B</td><td><b>12/20</b></td><td><b>17/20</b></td><td><b>13/20</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tnote">Twenty trials per task is a small sample; differences of one or two successes are within noise.</p>
+</section>
+
+<div class="wide">
+  <div class="task">
+    <h3>Task 1 &middot; Place the tennis ball on the can</h3>
+    <p>The top of the can is smaller than the ball, so the ball has to be released gently and centered.</p>
+    <div class="vgrid">
+      <figure><video src="static/videos/task1_1.mp4" poster="static/posters/task1_1.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+      <figure><video src="static/videos/task1_2.mp4" poster="static/posters/task1_2.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+      <figure><video src="static/videos/task1_3.mp4" poster="static/posters/task1_3.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+    </div>
+  </div>
+  <div class="task">
+    <h3>Task 2 &middot; Tape roll into the bowl, then the ball into the tape</h3>
+    <p>A two-stage task: the second placement depends on where the first one ended up.</p>
+    <div class="vgrid">
+      <figure><video src="static/videos/task2_1.mp4" poster="static/posters/task2_1.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+      <figure><video src="static/videos/task2_2.mp4" poster="static/posters/task2_2.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+      <figure><video src="static/videos/task2_3.mp4" poster="static/posters/task2_3.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+    </div>
+  </div>
+  <div class="task">
+    <h3>Task 3 &middot; Stand the lying can upright in the tape roll</h3>
+    <p>The can must be grasped on its side, rotated by 90&deg; and inserted into the roll.</p>
+    <div class="vgrid">
+      <figure><video src="static/videos/task3_1.mp4" poster="static/posters/task3_1.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+      <figure><video src="static/videos/task3_2.mp4" poster="static/posters/task3_2.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+      <figure><video src="static/videos/task3_3.mp4" poster="static/posters/task3_3.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+      <figure><video src="static/videos/task3_4.mp4" poster="static/posters/task3_4.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+      <figure><video src="static/videos/task3_5.mp4" poster="static/posters/task3_5.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+    </div>
+  </div>
+  <div class="task">
+    <h3>Additional task &middot; Pour water from a paper cup into a glass mug</h3>
+    <p>Not part of the three-task benchmark above; shown as qualitative examples.</p>
+    <div class="vgrid two">
+      <figure><video src="static/videos/task_water.mp4" poster="static/posters/task_water.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+      <figure><video src="static/videos/task_water2.mp4" poster="static/posters/task_water2.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<section class="col" id="benchmarks">
+  <h2><span class="num">Benchmarks</span>Simulation results</h2>
+  <p>Simulator versions, camera inputs, training data and evaluation protocols differ across papers, so the tables below give context rather than controlled comparisons. Numbers for other methods are as reported in prior work. <em>Open</em> marks methods with both code and weights public.</p>
+
+  <h3>LIBERO</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Model</th><th>Size</th><th>Open</th><th>Spatial</th><th>Object</th><th>Goal</th><th>Long</th><th>Average</th></tr></thead>
+      <tbody>
+        <tr><td>OpenVLA</td><td>7B</td><td>yes</td><td>84.7</td><td>88.4</td><td>79.2</td><td>53.7</td><td>76.5</td></tr>
+        <tr><td>&pi;<sub>0.5</sub></td><td>3B</td><td>yes</td><td>98.8</td><td>98.2</td><td>98.0</td><td>92.4</td><td>96.8</td></tr>
+        <tr><td>MMaDA-VLA</td><td>8B</td><td>yes</td><td>98.8</td><td>99.8</td><td>98.0</td><td>95.2</td><td>98.0</td></tr>
+        <tr><td>EO-1</td><td>3B</td><td>yes</td><td><b>99.7</b></td><td>99.8</td><td>99.2</td><td>94.8</td><td>98.4</td></tr>
+        <tr><td>Qwen-RobotManip</td><td>4B</td><td>no</td><td class="dim">&ndash;</td><td class="dim">&ndash;</td><td class="dim">&ndash;</td><td class="dim">&ndash;</td><td><b>99.1</b></td></tr>
+        <tr class="ours sep"><td>NEO-VLA</td><td>2B</td><td>yes</td><td>99.4</td><td><b>100.0</b></td><td><b>99.3</b></td><td><b>95.6</b></td><td>98.6</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tnote">NEO-VLA: 2,000 episodes per suite at step 27,500. LIBERO is close to saturated, so we report it mainly to show in-distribution performance is retained.</p>
+
+  <h3>LIBERO-Plus</h3>
+  <p>LIBERO-Plus evaluates seven kinds of distribution shift separately. NEO-VLA is strongest when the way the scene is observed changes (camera, noise), and weaker when the robot or the layout changes.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Model</th><th>Size</th><th>Open</th><th>Camera</th><th>Robot</th><th>Language</th><th>Light</th><th>Background</th><th>Noise</th><th>Layout</th><th>Total</th></tr></thead>
+      <tbody>
+        <tr><td>&pi;<sub>0</sub></td><td>3B</td><td>yes</td><td>13.8</td><td>6.0</td><td>58.8</td><td>85.0</td><td>81.4</td><td>79.0</td><td>68.9</td><td>53.6</td></tr>
+        <tr><td>StarVLA</td><td>4B</td><td>yes</td><td>52.5</td><td>49.8</td><td>88.5</td><td>95.7</td><td>95.7</td><td>73.0</td><td>76.9</td><td>74.1</td></tr>
+        <tr><td>ABot-M0</td><td>4B</td><td>yes</td><td>60.4</td><td>67.9</td><td>86.4</td><td>96.2</td><td>91.6</td><td>86.4</td><td>82.6</td><td>80.5</td></tr>
+        <tr><td>Cosmos-Policy</td><td>2B</td><td>yes</td><td>75.8</td><td>63.3</td><td>81.7</td><td>96.5</td><td>88.9</td><td>92.7</td><td>82.2</td><td>82.2</td></tr>
+        <tr><td>&pi;<sub>0.5</sub></td><td>3B</td><td>yes</td><td>78.4</td><td>73.6</td><td>80.8</td><td>96.2</td><td>94.1</td><td>89.0</td><td>84.5</td><td>84.4</td></tr>
+        <tr class="sep"><td>Qwen-RobotManip-scratch</td><td>4B</td><td>no</td><td>70.4</td><td>44.9</td><td>88.1</td><td>95.8</td><td>95.5</td><td>84.4</td><td>79.1</td><td>78.3</td></tr>
+        <tr><td>Being-H0.7</td><td>3B</td><td>no</td><td>82.0</td><td>59.0</td><td>82.8</td><td><b>97.8</b></td><td>90.0</td><td>93.5</td><td><b>88.5</b></td><td>84.8</td></tr>
+        <tr><td>Qwen-RobotManip</td><td>4B</td><td>no</td><td>87.2</td><td><b>75.5</b></td><td>85.6</td><td>96.6</td><td><b>97.7</b></td><td><b>97.7</b></td><td>87.3</td><td>89.0</td></tr>
+        <tr class="ours sep"><td>NEO-VLA</td><td>2B</td><td>yes</td><td><b>94.5</b></td><td>72.6</td><td><b>91.7</b></td><td>96.2</td><td>96.6</td><td>96.9</td><td>82.4</td><td><b>89.7</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tnote">The total is task-weighted rather than the mean of the seven axes. Other results follow Qwen-RobotManip.</p>
+
+  <h3>RoboTwin 2.0</h3>
+  <p>Under the official setting (2.5K clean training episodes), the main difference shows up when the policy is evaluated on randomized scenes.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Model</th><th>Size</th><th>Open</th><th>Clean</th><th>Clean2Rand</th></tr></thead>
+      <tbody>
+        <tr><td>FastWAM</td><td>6B</td><td>yes</td><td>77.80</td><td>1.90</td></tr>
+        <tr><td>StarVLA-OFT</td><td>3B</td><td>yes</td><td>46.52</td><td>3.16</td></tr>
+        <tr><td>&pi;<sub>0.5</sub></td><td>3B</td><td>yes</td><td>70.70</td><td>46.00</td></tr>
+        <tr><td>OLA-Sem</td><td>8B</td><td>no</td><td>75.12</td><td>67.56</td></tr>
+        <tr><td>Qwen-RobotManip</td><td>4B</td><td>no</td><td><b>89.58</b></td><td>68.12</td></tr>
+        <tr class="ours sep"><td>NEO-VLA</td><td>2B</td><td>yes</td><td>75.78</td><td><b>69.40</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>LIBERO-Pro</h3>
+  <p>LIBERO-Pro changes object appearance, object positions, instruction wording and task goals. NEO-VLA handles reworded instructions well but, like the other policies here, mostly fails when positions or goals change. Robust perception alone does not yet give flexible task execution.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Model</th><th>Size</th><th>Object</th><th>Position</th><th>Semantic</th><th>Task</th><th>Average</th></tr></thead>
+      <tbody>
+        <tr><td>OpenVLA</td><td>7B</td><td>93.0</td><td>0.0</td><td>97.3</td><td>0.0</td><td>47.6</td></tr>
+        <tr><td>&pi;<sub>0</sub></td><td>3B</td><td>90.5</td><td>0.0</td><td>90.5</td><td>0.0</td><td>45.3</td></tr>
+        <tr><td>&pi;<sub>0.5</sub></td><td>3B</td><td><b>96.0</b></td><td><b>20.8</b></td><td>95.8</td><td>0.8</td><td><b>53.3</b></td></tr>
+        <tr><td>X-VLA</td><td>0.9B</td><td>79.0</td><td>0.8</td><td>96.8</td><td><b>6.8</b></td><td>45.8</td></tr>
+        <tr class="ours sep"><td>NEO-VLA</td><td>2B</td><td>84.3</td><td>3.0</td><td><b>98.0</b></td><td>6.3</td><td>47.9</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr>
+
+<section class="col" id="training">
+  <h2><span class="num">Training</span>Data and recipe</h2>
+  <p><b>Backbone.</b> NEO-2B is a 40-layer decoder-only native vision-language model, trained in three stages (image-text pretraining, mid-training on captioning, conversation, OCR and detection data, then supervised instruction tuning). It uses native rotary position embeddings over time, height and width, causal attention for text and bidirectional attention within each image.</p>
+  <p><b>Robot pretraining corpus.</b> Nine public dataset families (AgiBot-World, Bimanual YAM, RoboCOIN, Open X-Embodiment, Galaxea Open-World, RoboMIND, RH20T, DROID and the simulated InternData-A1), 2.23M episodes and about 9,900 hours. Unreliable joint readings, constant channels, action outliers and corrupt episodes are masked or dropped, and camera calibration is checked against projected arm motion.</p>
+  <p><b>Recipe.</b> Stage 1 trains the action expert on a frozen backbone (113,400 steps, batch 8,192). Stage 2 unfreezes everything for 75,000 steps and co-trains with NEO-2B's understanding data. Stage 3 continues full fine-tuning on in-house action data for another 75,000 steps.</p>
+</section>
+<div class="wide">
+  <figure>
+    <img src="static/figures/NEO-VLA_data_pipeline.png" alt="Data quality filtering pipeline: checks for implausible joint readings, unreliable channels, action outliers, corrupt episodes and camera calibration." loading="lazy">
+    <figcaption><b>Data quality filtering.</b> Each check removes only the affected readings, channels, targets, episodes or calibration records, so usable data is kept.</figcaption>
+  </figure>
+</div>
+
+<hr>
+
+<section class="col" id="bibtex">
+  <h2><span class="num">Citation</span>BibTeX</h2>
+<pre id="bib">@article{fan2026neovla,
+  title   = {From Pixels to Actions: Towards Native Vision-Language-Action Policies},
+  author  = {Fan, Weichen and Diao, Haiwen and Wu, Penghao and Hu, Siyuan and
+             Huang, Ziqi and Liu, Tianqi and Sun, Mingze and Wang, Ziyi and
+             Cai, Zhongang and Deng, Hanming and Wang, Quan and Yang, Lei and
+             Lu, Lewei and Hong, Fangzhou and Chen, Zhaoxi and Lin, Dahua and
+             Liu, Ziwei},
+  year    = {2026}
+}</pre>
+  <button class="copy" type="button" data-copy="bib">Copy</button>
+  <p style="margin-top:28px">NEO-VLA builds on the NEO native vision-language backbone: Diao et al., <em>From Pixels to Words: Towards Native Vision-Language Primitives at Scale</em>, ICLR 2026.</p>
+</section>
+</main>
+
+<footer class="col">
+  Correspondence: <a href="mailto:ziwei.liu@ntu.edu.sg">ziwei.liu@ntu.edu.sg</a>
+</footer>
+
+<script>
+// Place dots on each zoomed axis from the printed values.
+document.querySelectorAll('.bars.dots').forEach(function (c) {
+  var lo = +c.dataset.min, hi = +c.dataset.max, pct = function (v) { return (v - lo) / (hi - lo) * 100; };
+  c.querySelectorAll('.row').forEach(function (r) {
+    r.querySelector('.fill').style.left = pct(parseFloat(r.querySelector('.val').textContent)) + '%';
+  });
+  var t = c.querySelector('.ticks');
+  for (var v = lo; v <= hi; v += 5) {
+    var s = document.createElement('span'); s.textContent = v; s.style.left = pct(v) + '%'; t.appendChild(s);
+  }
+  var n = document.createElement('div'); n.className = 'axisnote'; n.textContent = 'Axis starts at ' + lo + '%';
+  c.appendChild(n);
+});
+
+// Play videos only while they are on screen.
+(function () {
+  var vids = document.querySelectorAll('video[data-autoplay]');
+  if (!('IntersectionObserver' in window)) {
+    vids.forEach(function (v) { v.preload = 'metadata'; v.play().catch(function () {}); });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      var v = e.target;
+      if (e.isIntersecting) { v.play().catch(function () {}); }
+      else if (!v.paused) { v.pause(); }
+    });
+  }, { threshold: 0.35 });
+  vids.forEach(function (v) { io.observe(v); });
+})();
+
+document.querySelectorAll('[data-copy]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var text = document.getElementById(btn.dataset.copy).textContent;
+    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () {});
+  });
+});
+</script>
+</body>
+</html>

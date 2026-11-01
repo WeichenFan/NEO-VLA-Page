@@ -1,0 +1,4 @@
+# Source material kept locally only
+*.zip
+assets/
+.DS_Store
