@@ -182,6 +182,7 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
     <span title="Link will be added when available">Paper (coming soon)</span>
     <span title="Link will be added when available">Code (coming soon)</span>
     <span title="Link will be added when available">Weights (coming soon)</span>
+    <a href="#video">Video</a>
     <a href="#bibtex">BibTeX</a>
   </nav>
 </header>
@@ -216,6 +217,12 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
     <li><a href="#finding-3"><strong>Understanding data matters in post-training.</strong>
       <small>On RoboTwin 2.0 Clean2Rand, co-training with NEO's understanding corpus gives 69.4%, a caption-only mix gives 47.2%, and action data alone gives 10.7%.</small></a></li>
   </ol>
+</section>
+
+<section class="col" id="video">
+  <h2><span class="num">Video</span>NEO-VLA in two minutes</h2>
+  <video src="static/videos/neo-vla-overview.mp4" poster="static/posters/neo-vla-overview.jpg" controls playsinline preload="none" style="border:1px solid var(--rule)"></video>
+  <p class="tnote">No audio. Robot clips are sped up 2&ndash;3&times;; the speed is marked in each shot.</p>
 </section>
 
 <section class="wide" id="method">
@@ -270,22 +277,6 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
 </div>
 
 <section class="col" style="padding-top:0">
-  <h3>What a linear probe can read at each depth</h3>
-  <p>Linear probes on frozen backbones tell a consistent story. All three backbones carry similar peak depth and correspondence information, and the peak is early in each (22&ndash;32% of depth). The difference is in what the action expert can reach: averaged over the layers the expert reads, NEO's representations are far more linearly decodable.</p>
-  <div class="tablewrap">
-    <table>
-      <thead>
-        <tr><th rowspan="2">Backbone</th><th colspan="2" style="text-align:center">Depth (&delta;<sub>1</sub>, %)</th><th colspan="2" style="text-align:center">Correspondence (PCK@0.1, %)</th></tr>
-        <tr><th>Peak (rel. depth)</th><th>Read-layer mean</th><th>Peak (rel. depth)</th><th>Read-layer mean</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Qwen3-VL-2B</td><td>78.2 (0.22)</td><td>54.6</td><td>61.5 (0.28)</td><td>38.2</td></tr>
-        <tr><td>Gemma-3-4B</td><td>80.1 (0.25)</td><td>57.9</td><td>63.7 (0.30)</td><td>41.0</td></tr>
-        <tr class="ours"><td>NEO-2B (native)</td><td>79.4 (0.30)</td><td>73.8</td><td>62.8 (0.32)</td><td>58.1</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <p class="tnote">Probes are trained on held-out images with the backbone frozen; no robot actions are involved. Higher is better.</p>
   <p class="takeaway">Control draws on early, spatially detailed computation inside the backbone, and a policy that only sees the last layers leaves that on the table.</p>
 </section>
 
