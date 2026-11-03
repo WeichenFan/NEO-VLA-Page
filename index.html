@@ -83,6 +83,8 @@ figcaption b { color: var(--ink); font-weight: 600; }
 /* videos */
 .vgrid { display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); }
 .vgrid.two { grid-template-columns: repeat(2, 1fr); }
+.vgrid.one { grid-template-columns: minmax(0, 600px); justify-content: center; }
+.vgrid.one video { aspect-ratio: 4 / 3; }
 .vgrid figure { margin: 0; }
 video { width: 100%; height: auto; display: block; background: #111; border-radius: 2px; aspect-ratio: 16 / 9; object-fit: cover; }
 .vlabel { font: 13.5px/1.45 var(--sans); color: var(--muted); margin-top: 6px; }
@@ -221,9 +223,9 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
 </section>
 
 <section class="col" id="video">
-  <h2><span class="num">Video</span>NEO-VLA in two minutes</h2>
+  <h2><span class="num">Video</span>NEO-VLA in two and a half minutes</h2>
   <video src="static/videos/neo-vla-overview.mp4" poster="static/posters/neo-vla-overview.jpg" controls playsinline preload="none" style="border:1px solid var(--rule)"></video>
-  <p class="tnote">Robot clips are sped up 2&ndash;4&times;; the speed is marked in each shot.</p>
+  <p class="tnote">Robot clips are sped up 2&ndash;8&times;; the speed is marked in each shot.</p>
 </section>
 
 <section class="wide" id="method">
@@ -407,6 +409,13 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
     <div class="vgrid two">
       <figure><video src="static/videos/task_water.mp4" poster="static/posters/task_water.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
       <figure><video src="static/videos/task_water2.mp4" poster="static/posters/task_water2.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
+    </div>
+  </div>
+  <div class="task">
+    <h3>Additional task &middot; Place four gunkan sushi on a plate</h3>
+    <p>The policy picks the four gunkan pieces, one at a time, from a table covered with other sushi and places them on the plate. Not part of the three-task benchmark; shown at real-time speed as a qualitative example.</p>
+    <div class="vgrid one">
+      <figure><video src="static/videos/task_gunkan.mp4" poster="static/posters/task_gunkan.jpg" muted loop playsinline preload="none" controls data-autoplay></video></figure>
     </div>
   </div>
 </div>
