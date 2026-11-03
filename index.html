@@ -287,22 +287,22 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
 
 <section class="col" id="finding-2">
   <h2><span class="num">Finding 2</span>Attaching Qwen's vision encoder to the expert does not help; the gain comes from native pretraining</h2>
-  <p>We put three backbones under the same action expert and robot-training corpus: Qwen3-VL-2B, Gemma-3-4B and NEO-2B. With the backbone frozen, only the expert learns, so the policy must work with the pretrained representations as they are. NEO-2B reaches 90.9% here, 11.4 points above Qwen3-VL and on par with both encoder-based models after full fine-tuning.</p>
+  <p>We put three backbones under the same action expert and robot-training corpus: Qwen3-VL-2B, Gemma-3-4B and NEO-2B. With the backbone frozen, only the expert learns, so the policy must work with the pretrained representations as they are. NEO-2B reaches 90.9% here, 11.4 points above Qwen3-VL and on par with both encoder-based models after full fine-tuning. Fully fine-tuned, it reaches 95.3%, the best score in every suite.</p>
 
   <div class="tablewrap">
-    <p class="tcap"><b>Backbone comparison on LIBERO.</b> Success (%) at the final 30k-step checkpoint, 500 episodes per suite.</p>
+    <p class="tcap"><b>Backbone comparison on LIBERO.</b> Success (%) at the final 30k-step checkpoint, averaged over 2,000 episodes (500 per suite). NEO-VLA rows use the <code>skip-28</code> layer map.</p>
     <table>
       <thead>
         <tr><th>Backbone</th><th>Size</th><th>Adaptation</th><th>Spatial</th><th>Object</th><th>Goal</th><th>Long</th><th>Average</th></tr>
       </thead>
       <tbody>
         <tr><td>Qwen3-VL</td><td>2B</td><td>Frozen</td><td>71.4</td><td>89.8</td><td>92.8</td><td>64.0</td><td>79.5</td></tr>
-        <tr><td></td><td></td><td>Encoder unfrozen<sup>a</sup></td><td>91.8</td><td>92.0</td><td>94.0</td><td>79.0</td><td>89.2</td></tr>
         <tr><td></td><td></td><td>Full FT</td><td>92.2</td><td>96.6</td><td>95.8</td><td>78.6</td><td>90.8</td></tr>
+        <tr><td></td><td></td><td>Encoder unfrozen<sup>a</sup></td><td>91.8</td><td>92.0</td><td>94.0</td><td>79.0</td><td>89.2</td></tr>
         <tr class="sep"><td>Gemma-3</td><td>4B</td><td>Frozen</td><td>80.2</td><td>93.6</td><td>92.6</td><td>71.6</td><td>84.5</td></tr>
-        <tr><td></td><td></td><td>Full FT</td><td>89.0</td><td><b>97.6</b></td><td>94.8</td><td>82.8</td><td>91.05</td></tr>
-        <tr class="ours sep"><td>NEO-VLA</td><td>2B</td><td>Frozen</td><td>89.2</td><td>95.8</td><td>93.2</td><td><b>85.4</b></td><td>90.9</td></tr>
-        <tr class="ours"><td></td><td></td><td>Full FT</td><td><b>96.4</b></td><td>97.2</td><td><b>96.2</b></td><td>84.6</td><td><b>93.6</b></td></tr>
+        <tr><td></td><td></td><td>Full FT</td><td>89.0</td><td>97.6</td><td>94.8</td><td>82.8</td><td>91.0</td></tr>
+        <tr class="ours sep"><td>NEO-VLA</td><td>2B</td><td>Frozen</td><td>89.2</td><td>95.8</td><td>93.2</td><td>85.4</td><td>90.9</td></tr>
+        <tr class="ours"><td></td><td></td><td>Full FT</td><td><b>95.6</b></td><td><b>97.8</b></td><td><b>96.0</b></td><td><b>92.0</b></td><td><b>95.3</b></td></tr>
       </tbody>
     </table>
   </div>
@@ -320,7 +320,7 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
     <div class="head">Full fine-tuning</div>
     <div class="row"><div class="lab">Qwen3-VL, original interface</div><div class="track"><div class="fill" style="width:90.8%"></div></div><div class="val">90.8</div></div>
     <div class="row"><div class="lab">Qwen3-VL + encoder access</div><div class="track"><div class="fill" style="width:90.9%"></div></div><div class="val">90.9</div></div>
-    <div class="row hi"><div class="lab">NEO-VLA</div><div class="track"><div class="fill" style="width:93.6%"></div></div><div class="val">93.6</div></div>
+    <div class="row hi"><div class="lab">NEO-VLA</div><div class="track"><div class="fill" style="width:95.3%"></div></div><div class="val">95.3</div></div>
     <div class="axis"><div></div><div class="ticks"></div><div></div></div>
   </div>
 
