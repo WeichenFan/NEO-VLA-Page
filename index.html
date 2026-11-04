@@ -350,8 +350,8 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
     </table>
   </div>
 
-  <p>Co-training with NEO-2B's own understanding corpus keeps every understanding score within 1.5 points of the starting checkpoint and reaches 69.4% on Clean2Rand. Action-only finetuning loses the ability to produce valid text and its policy falls to 10.7%. Co-training with ShareGPT4V-COCO captions instead of the native corpus reaches 47.2%. In our recipe, understanding examples are packed into every other optimizer step with an auxiliary next-token loss weighted by 0.1.</p>
-  <p class="takeaway">Action learning depends on keeping the right kind of understanding. The backbone's own pretraining-aligned data preserves it and gives the most robust policy; captions help less, and action-only finetuning loses it.</p>
+  <p>Co-training with NEO-2B's own understanding corpus keeps every understanding score within 1.5 points of the starting checkpoint and reaches 69.4% on Clean2Rand. Action-only finetuning loses the ability to produce valid text and its policy falls to 10.7%. In our recipe, understanding examples are packed into every other optimizer step with an auxiliary next-token loss weighted by 0.1.</p>
+  <p class="takeaway">Action learning depends on retaining the backbone's own understanding. Pretraining-aligned co-training preserves it and gives the strongest policy, while action-only finetuning loses valid text output and degrades severely.</p>
 </section>
 
 <hr>
