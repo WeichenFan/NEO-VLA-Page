@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NEO-VLA: Native Vision-Language-Action Policies</title>
-<meta name="description" content="NEO-VLA is an encoder-free vision-language-action policy built on the native NEO-2B backbone. Action-relevant information sits in shallow backbone layers, the gains come from native vision-language pretraining, and understanding data matters in post-training.">
+<meta name="description" content="NEO-VLA is an encoder-free vision-language-action policy built on the native NEO-2B backbone. Action-relevant information is organized across backbone depth, the gains come from native vision-language pretraining, and co-training with understanding data keeps understanding while giving the strongest policy.">
 <meta property="og:title" content="From Pixels to Actions: Towards Native Vision-Language-Action Policies">
 <meta property="og:description" content="NEO-VLA: an encoder-free VLA policy. Findings on readout depth, native pretraining, and understanding data in post-training.">
 <meta property="og:image" content="static/figures/overview.png">
@@ -180,7 +180,7 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
 
   <nav class="links" aria-label="Resources">
     <span title="Link will be added when available">Paper (coming soon)</span>
-    <a href="https://github.com/EvolvingLMMs-Lab/NEO-VLA">Code</a>
+    <a href="https://github.com/EvolvingLMMs-Lab/NEO">Code</a>
     <a href="https://huggingface.co/weepiess2383/NEO-VLA">Weights</a>
     <a href="https://huggingface.co/datasets/weepiess2383/NEO-VLA-Action-Pretrain">Dataset</a>
     <a href="#video">Video</a>
@@ -211,12 +211,12 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
   <p>Because the readout depth becomes a design choice, we can ask where in the backbone the information needed for control actually lives. Three findings come out of this study:</p>
 
   <ol class="findings">
-    <li><a href="#finding-1"><strong>Action-relevant information sits in the shallow layers of the VLM.</strong>
-      <small>Reading early layers beats reading late layers at matched expert size, and intervening on layers 0&ndash;10 changes the predicted action far more than intervening on later layers.</small></a></li>
+    <li><a href="#finding-1"><strong>Action-relevant information is organized across depth, not only in the final representation.</strong>
+      <small>With a frozen backbone, early layers dominate: reading them beats reading late layers at matched expert size. After full fine-tuning, a readout spread across all depths does best. Intervening on layers 0&ndash;10 changes the predicted action far more than intervening on later layers.</small></a></li>
     <li><a href="#finding-2"><strong>Attaching Qwen's vision encoder to the action expert does not help. The gain comes from native vision-language pretraining.</strong>
       <small>Routing the expert to Qwen3-VL's intermediate vision-tower features lowers frozen-backbone LIBERO success from 79.5% to 64.9%. The frozen native backbone reaches 90.9%.</small></a></li>
     <li><a href="#finding-3"><strong>Understanding data matters in post-training.</strong>
-      <small>On RoboTwin 2.0 Clean2Rand, co-training with NEO's understanding corpus gives 69.4%, a caption-only mix gives 47.2%, and action data alone gives 10.7%.</small></a></li>
+      <small>Co-training with NEO's understanding corpus keeps understanding within 1.5 points of the starting checkpoint and reaches 69.4% on RoboTwin 2.0 Clean2Rand. Action-only finetuning loses valid text output and falls to 10.7%.</small></a></li>
   </ol>
 </section>
 
@@ -244,8 +244,8 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
 <hr>
 
 <section class="col" id="finding-1">
-  <h2><span class="num">Finding 1</span>Action-relevant information sits in the shallow layers of the VLM</h2>
-  <p>Each layer of the action expert reads the cached keys and values of one backbone layer. We keep the expert fixed at 28 layers and change only which backbone layers it reads: <code>skip-28</code> spreads its reads across all 40 layers, <code>end-28</code> reads layers 12&ndash;39, and <code>first-28</code> reads layers 0&ndash;27.</p>
+  <h2><span class="num">Finding 1</span>Action-relevant information is organized across depth</h2>
+  <p>Each layer of the action expert reads the cached keys and values of one backbone layer. We keep the expert fixed at 28 layers and change only which backbone layers it reads: <code>skip-28</code> spreads its reads across all 40 layers, <code>end-28</code> reads layers 12&ndash;39, and <code>first-28</code> reads layers 0&ndash;27. All variants are pretrained on Open X-Embodiment for 75k iterations under identical settings.</p>
 
   <div class="bars dots" data-min="80" data-max="100" role="figure" aria-label="LIBERO average success rate by layer map">
     <p class="tcap"><b>Layer-map ablation on LIBERO.</b> Average success (%) over the four suites, 2,000 rollouts per configuration, step 30k.</p>
@@ -264,10 +264,10 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
   </div>
   <p class="tnote">The cleanest comparison is <code>skip-28</code> vs. <code>end-28</code>: both keep all 40 backbone layers and the same 28-layer expert, and differ only in whether early layers are read. <code>first-28</code> and <code>first-14</code> also shorten the backbone, so they change depth and compute as well as readout position.</p>
 
-  <p>With a frozen backbone, dropping access to the first 12 layers costs 4.2 points (90.9 &rarr; 86.7). Full fine-tuning narrows the gap but does not close it (95.3 vs. 92.5).</p>
+  <p>With a frozen backbone, early layers dominate: the maps that read only early layers score highest, and dropping access to the first 12 layers costs 4.2 points (90.9 &rarr; 86.7). After full fine-tuning, the distributed <code>skip-28</code> readout is best (95.3, against 94.6 for <code>first-28</code> and 92.5 for <code>end-28</code>), so fine-tuning narrows the early-layer gap but does not close it.</p>
 
   <h3>Where the expert is sensitive</h3>
-  <p>To see which attachment points matter, we intervene on one at a time. Replacing the keys and values at one layer with those from a different observation and task raises translation error most at layers 0&ndash;10. Noise of the same magnitude stays within 0.004&nbsp;cm of the unchanged error, so the effect comes from the content being replaced, not the size of the disturbance. Masking the wrist image hurts most around layers 6&ndash;10; masking the instruction hurts most at layer 0, with a smaller rise near layer 17.</p>
+  <p>To see which attachment points matter, we intervene on one at a time. Replacing the keys and values at one layer with those from a different observation and task raises translation error most at layers 0&ndash;10. Noise of the same magnitude stays within 0.004&nbsp;cm of the unchanged error, so the effect comes from the content being replaced, not the size of the disturbance. Masking the wrist image hurts most around layers 6&ndash;10; masking the instruction hurts most at layer 0, with a smaller rise near layer 17. Language, appearance and geometry each have their strongest influence at a different depth.</p>
 </section>
 
 <div class="wide">
@@ -278,14 +278,14 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
 </div>
 
 <section class="col" style="padding-top:0">
-  <p class="takeaway">Control draws on early, spatially detailed computation inside the backbone, and a policy that only sees the last layers leaves that on the table.</p>
+  <p class="takeaway">Action-relevant information is spread across the backbone rather than held only in its final layer. Early layers carry most of what a frozen policy needs, and a fine-tuned policy does best when it can read from every depth.</p>
 </section>
 
 <hr>
 
 <section class="col" id="finding-2">
   <h2><span class="num">Finding 2</span>Attaching Qwen's vision encoder to the expert does not help; the gain comes from native pretraining</h2>
-  <p>We put three backbones under the same action expert and robot-training corpus: Qwen3-VL-2B, Gemma-3-4B and NEO-2B. With the backbone frozen, only the expert learns, so the policy must work with the pretrained representations as they are. NEO-2B reaches 90.9% here, 11.4 points above Qwen3-VL and on par with both encoder-based models after full fine-tuning. Fully fine-tuned, it reaches 95.3%, the best score in every suite.</p>
+  <p>We put three backbones under the same action expert and robot-training corpus: Qwen3-VL-2B, Gemma-3-4B and NEO-2B, each pretrained on Open X-Embodiment for 75k iterations under the same setting. With the backbone frozen, only the expert learns, so the policy must work with the pretrained representations as they are. NEO-2B reaches 90.9% here, 11.4 points above Qwen3-VL and on par with both encoder-based models after full fine-tuning. Fully fine-tuned, it reaches 95.3%, the best score in every suite.</p>
 
   <div class="tablewrap">
     <p class="tcap"><b>Backbone comparison on LIBERO.</b> Success (%) at the final 30k-step checkpoint, averaged over 2,000 episodes (500 per suite). NEO-VLA rows use the <code>skip-28</code> layer map.</p>
@@ -324,25 +324,34 @@ footer.col { padding: 40px 16px 60px; font: 13.5px/1.6 var(--sans); color: var(-
 
   <p>Encoder access makes the frozen Qwen3-VL policy worse (79.5 &rarr; 64.9), and after full fine-tuning the two interfaces are equal (90.8 vs. 90.9). Early visual features are only useful when they are learned jointly with language and presented in the space the rest of the model uses. NEO's encoder-free pretraining produces such features; an encoder bolted on in front of a language model does not.</p>
   <p class="tnote">Caveat: the backbones differ in pretraining data and capacity, so this comparison does not isolate the effect of removing the encoder alone. It does show that the native backbone is a strong starting point for action learning.</p>
-  <p class="takeaway">Exposing more of a conventional encoder is not enough. The benefit of NEO-VLA comes from native, encoder-free vision-language pretraining.</p>
+  <p class="takeaway">Exposing more of a conventional encoder is not enough. NEO-VLA's advantage comes from how native, encoder-free pretraining shapes early visual features into control-ready representations.</p>
 </section>
 
 <hr>
 
 <section class="col" id="finding-3">
   <h2><span class="num">Finding 3</span>Understanding data matters in post-training</h2>
-  <p>VLA post-training is usually done either on action data alone or with some vision-language data mixed in. We compared three recipes on RoboTwin 2.0, trained on clean scenes and evaluated on randomized ones (Clean2Rand): co-training with NEO-2B's own multimodal understanding corpus, co-training with ShareGPT4V-COCO captions, and action data only.</p>
+  <p>VLA post-training either finetunes on action data alone or co-trains with additional multimodal understanding data. We compare both against the checkpoint before post-training, on five understanding benchmarks and on RoboTwin 2.0 trained on clean scenes and evaluated on randomized ones (Clean2Rand).</p>
 
-  <div class="bars" role="figure" aria-label="RoboTwin 2.0 Clean2Rand success rate by post-training recipe">
-    <p class="tcap"><b>Post-training recipe ablation.</b> RoboTwin 2.0 Clean2Rand success (%).</p>
-    <div class="row hi"><div class="lab">+ NEO understanding data</div><div class="track"><div class="fill" style="width:69.4%"></div></div><div class="val">69.4</div></div>
-    <div class="row"><div class="lab">+ ShareGPT4V-COCO</div><div class="track"><div class="fill" style="width:47.2%"></div></div><div class="val">47.2</div></div>
-    <div class="row"><div class="lab">Action data only</div><div class="track"><div class="fill" style="width:10.7%"></div></div><div class="val">10.7</div></div>
-    <div class="axis"><div></div><div class="ticks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div><div></div></div>
+  <div class="tablewrap">
+    <p class="tcap"><b>Understanding before and after post-training.</b> Understanding scores (%) and RoboTwin 2.0 Clean2Rand success (%). The action-only model no longer produces valid text, so it scores 0 on every understanding benchmark.</p>
+    <table>
+      <thead>
+        <tr><th>Benchmark</th><th>Before post-training</th><th>+ Co-training</th><th>+ Action-only</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>MMBench-EN (dev)</td><td>82.7</td><td>81.2</td><td>0.0</td></tr>
+        <tr><td>RealWorldQA</td><td>66.8</td><td>68.4</td><td>0.0</td></tr>
+        <tr><td>AI2D (test)</td><td>82.9</td><td>82.3</td><td>0.0</td></tr>
+        <tr><td>TextVQA (val)</td><td>76.6</td><td>76.4</td><td>0.0</td></tr>
+        <tr><td>ChartQA (test)</td><td>80.8</td><td>80.4</td><td>0.0</td></tr>
+        <tr class="sep"><td>RoboTwin 2.0 Clean2Rand</td><td>&ndash;</td><td><b>69.4</b></td><td>10.7</td></tr>
+      </tbody>
+    </table>
   </div>
 
-  <p>Training on action data alone collapses under randomization. Simple captions recover part of the gap, and the backbone's own understanding corpus recovers most of it. In our recipe, understanding examples are packed into every other optimizer step with an auxiliary next-token loss weighted by 0.1.</p>
-  <p class="takeaway">Keeping the backbone's understanding ability alive during action training is what lets the policy hold up when scenes change, and the closer the co-training data is to the backbone's pretraining corpus, the better.</p>
+  <p>Co-training with NEO-2B's own understanding corpus keeps every understanding score within 1.5 points of the starting checkpoint and reaches 69.4% on Clean2Rand. Action-only finetuning loses the ability to produce valid text and its policy falls to 10.7%. Co-training with ShareGPT4V-COCO captions instead of the native corpus reaches 47.2%. In our recipe, understanding examples are packed into every other optimizer step with an auxiliary next-token loss weighted by 0.1.</p>
+  <p class="takeaway">Action learning depends on keeping the right kind of understanding. The backbone's own pretraining-aligned data preserves it and gives the most robust policy; captions help less, and action-only finetuning loses it.</p>
 </section>
 
 <hr>
